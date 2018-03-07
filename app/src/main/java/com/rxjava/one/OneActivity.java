@@ -16,5 +16,9 @@ public class OneActivity extends AppCompatActivity {
 
     private void testBasicSample(){
         Basic1.sample();
+//        Basic1.map();
+//        Basic1.flatmap();
+//        Basic1.concatmap();
+//        Basic1.zip();
     }
 }
