@@ -22,29 +22,44 @@
 
 package com.raywenderlich.cheesefinder;
 
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Observable;
 import io.reactivex.ObservableEmitter;
 import io.reactivex.ObservableOnSubscribe;
 import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Cancellable;
 import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
+import io.reactivex.functions.Predicate;
 import io.reactivex.schedulers.Schedulers;
 
 public class CheeseActivity extends BaseSearchActivity {
+    private final String TAG = CheeseActivity.class.getSimpleName();
 
-
+    private Disposable mDisposable;
     @Override
     protected void onStart() {
         super.onStart();
-        Observable<String> searchTextObservable = createClickSearchBtnObservable();
 
-        //subscribe1(searchTextObservable);
+//        Observable<String> searchTextObservable = createClickSearchBtnObservable();
+//        subscribe1(searchTextObservable);
+//        subscribe2(searchTextObservable);
+
+//        Observable<String> searchTextChangedObservable = createSearchTextChangedObservable();
+//        subscribe2(searchTextChangedObservable);
+
+        Observable<String> searchTextClickObservable = createClickSearchBtnObservable();
+        Observable<String> searchTextChangedObservable = createSearchTextChangedObservable();
+        Observable<String> searchTextObservable = Observable.merge(searchTextClickObservable,searchTextChangedObservable);
         subscribe2(searchTextObservable);
     }
 
@@ -58,7 +73,15 @@ public class CheeseActivity extends BaseSearchActivity {
     }
 
     private void subscribe2(Observable<String> searchTextObservable){
-        searchTextObservable
+        mDisposable = searchTextObservable
+                .observeOn(AndroidSchedulers.mainThread())
+                .doOnNext(new Consumer<String>() {
+                    @Override
+                    public void accept(String s) throws Exception {
+                        Log.d(TAG,"subscribe2 showProgressBar");
+                        showProgressBar();
+                    }
+                })
                 .observeOn(Schedulers.io())
                 .map(new Function<String, List<String>>() {
 
@@ -70,9 +93,15 @@ public class CheeseActivity extends BaseSearchActivity {
                 .subscribe(new Consumer<List<String>>() {
                     @Override
                     public void accept(List<String> strings) throws Exception {
+                        hideProgressBar();
                         showResult(strings);
                     }
-        });
+                }, new Consumer<Throwable>() {
+                    @Override
+                    public void accept(Throwable throwable) throws Exception {
+
+                    }
+                });
     }
 
     private Observable<String> createClickSearchBtnObservable(){
@@ -97,8 +126,50 @@ public class CheeseActivity extends BaseSearchActivity {
         });
     }
 
+    private Observable<String> createSearchTextChangedObservable(){
+        return Observable.create(new ObservableOnSubscribe<String>() {
+            @Override
+            public void subscribe(final ObservableEmitter<String> e) throws Exception {
+                final TextWatcher textWatcher = new TextWatcher() {
+                    @Override
+                    public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+                    }
+
+                    @Override
+                    public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+                    }
+
+                    @Override
+                    public void afterTextChanged(Editable s) {
+                        e.onNext(s.toString());
+                    }
+                };
+                mQueryEditText.addTextChangedListener(textWatcher);
+                e.setCancellable(new Cancellable() {
+                    @Override
+                    public void cancel() throws Exception {
+                        mQueryEditText.removeTextChangedListener(textWatcher);
+                    }
+                });
+            }
+        }).filter(new Predicate<String>() {
+            @Override
+            public boolean test(String s) throws Exception {
+                return s.length() > 2;
+            }
+        }).debounce(1000, TimeUnit.MILLISECONDS);
+    }
+
     private void show(String str){
         Toast.makeText(this,str,Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        mDisposable.dispose();
     }
 
     @Override

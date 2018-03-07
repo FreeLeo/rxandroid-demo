@@ -33,6 +33,8 @@ import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import com.rxjava.R;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
